@@ -94,21 +94,14 @@ public class UDPClient {
     }
     
     
-    public ArrayList<String> readFile(){
+    public byte[] readFile(){
     	Path file = Paths.get("C:", "Users", "Edvan Jr", "Documents", "texto.txt");
     	
     	if(Files.exists(file)){
     		try{ 
     			
-    			
-    			List<String> dados = Files.readAllLines(file, Charset.defaultCharset());
-    		    ArrayList<String> dadosConsolidados = new ArrayList<String>();
-    		    
-    		    for(int i = 0; i < dados.size(); i++){
-    		    	dadosConsolidados.add(i + dados.get(i));
-    		    } 
-    		    
-    		    return dadosConsolidados;
+    			byte[] b = Files.readAllBytes(file);
+    		    return b;
     		    
         	} catch (IOException e) {
     		    System.err.println(e);

@@ -23,15 +23,13 @@ public class SocketError extends DatagramSocket{
 		return this.errorProb;
 	}
 	
-	public void sendWithError(DatagramPacket dp) throws IOException, SocketTimeoutException{
+	public void sendWithError(DatagramPacket dp) throws IOException{
 		if(gerarProbabilidade() > errorProb){
 			send(dp);
-		} else {
-			throw new SocketTimeoutException();
-		}
+		} 
 	}
 	
-	public byte[] recvWithError(DatagramPacket dp) throws IOException{
+	public byte[] recvWithError(DatagramPacket dp) throws IOException, SocketTimeoutException{
 			
 		receive(dp);
 		
