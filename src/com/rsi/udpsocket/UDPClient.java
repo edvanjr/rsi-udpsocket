@@ -1,13 +1,30 @@
 package com.rsi.udpsocket;
 
-import java.io.*;
-import java.net.*;
-import java.util.Random;
+import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.ObjectOutputStream;
+import java.net.DatagramPacket;
+import java.net.InetAddress;
+import java.net.SocketException;
+import java.net.SocketTimeoutException;
+import java.net.UnknownHostException;
+import java.nio.charset.Charset;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 
 public class UDPClient {
-    private DatagramSocket socket = null;
+    private SocketError socket = null;
     private Arquivo arquivo = null;
-    private String arquivoOrigem = "C:/Users/Edvan Jr/Pictures/edvan.jpg";
+    private String arquivoOrigem = "C:/Users/Edvan Jr/Documents/texto.txt";
     private String arquivoDestino = "C:/Users/Edvan Jr/Desktop/";
     private String hostName = "localHost";
 
@@ -19,32 +36,47 @@ public class UDPClient {
         try {
         	boolean ok = false;
         	
-        	while(!ok){
-	        	socket = new DatagramSocket();
+        	ArrayList<String> dados = readFile();
+        	int count = dados.size();
+        	
+        	while(count >= 0){
+        		
+	        	socket = new SocketError();
+	        	socket.setErrorProb(0.8);
+	        	
 	            InetAddress IPAddress = InetAddress.getByName(hostName);
+	            
+	            // Criando arquivo a ser enviado
 	            byte[] incomingData = new byte[1024];
 	            arquivo = getArquivo();
 	            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
 	            ObjectOutputStream os = new ObjectOutputStream(outputStream);
 	            os.writeObject(arquivo);
 	            byte[] data = outputStream.toByteArray();
-	            DatagramPacket sendPacket = new DatagramPacket(data, data.length, IPAddress, 12000);
-	            socket.send(sendPacket);
 	            
-	            System.out.println("Pacote enviado!");
-	            System.out.println("Aguardando resposta...");
+	            System.out.println(data.length);
 	            
-	            DatagramPacket incomingPacket = new DatagramPacket(incomingData, incomingData.length);
-	            socket.receive(incomingPacket);
-	            String resposta = new String(incomingPacket.getData(), 0, incomingPacket.getLength());
 	            
-	            System.out.println("Resposta recebida: " + resposta);
-	            
-	            if(resposta.toString().equalsIgnoreCase("Success")){
-	            	ok = true;
-	            	System.out.println("OK!");
-	            }else{
-	            	System.out.println("Reenviando pacote.");
+	            try{
+	            	
+	            	// Enviando pacote
+	            	DatagramPacket sendPacket = new DatagramPacket(data, data.length, IPAddress, 12000);
+	            	
+	            	socket.sendWithError(sendPacket);
+	            	System.out.println("Arquivo enviado...");
+	            	
+	            	//Recebendo resposta
+            		DatagramPacket incomingPacket = new DatagramPacket(incomingData, incomingData.length);
+    	            socket.recvWithError(incomingPacket);
+    	            String resposta = new String(incomingPacket.getData(), 0, incomingPacket.getLength());
+   	                System.out.println("Resposta recebida: " + resposta);
+   	                
+   	                ok = true;
+	            	
+	            	
+	            }catch(SocketTimeoutException e) {
+	            	System.out.println("SocketTimeoutException: Reenviando o pacote...");
+	            	continue;
 	            }
         	}
         	
@@ -60,6 +92,34 @@ public class UDPClient {
             e.printStackTrace();
         }
     }
+    
+    
+    public ArrayList<String> readFile(){
+    	Path file = Paths.get("C:", "Users", "Edvan Jr", "Documents", "texto.txt");
+    	
+    	if(Files.exists(file)){
+    		try{ 
+    			
+    			
+    			List<String> dados = Files.readAllLines(file, Charset.defaultCharset());
+    		    ArrayList<String> dadosConsolidados = new ArrayList<String>();
+    		    
+    		    for(int i = 0; i < dados.size(); i++){
+    		    	dadosConsolidados.add(i + dados.get(i));
+    		    } 
+    		    
+    		    return dadosConsolidados;
+    		    
+        	} catch (IOException e) {
+    		    System.err.println(e);
+    		    return null;
+    		}
+    	}else{
+    		System.out.println("Caminho do arquivo não encontrado.");
+    		return null;
+    	}
+    	
+	}
     
     
     // Método responsável por criar o objeto que vai com o arquivo
@@ -85,15 +145,7 @@ public class UDPClient {
                 }
                 fileEvent.setTamanhoArquivo(len);
                 fileEvent.setArquivo(fileBytes);
-                
-                Random random = new Random();
-                
-                // Simulador de erro. Define se o pacote vai com erro ou não
-                if(random.nextInt(2) == 0){
-                	fileEvent.setStatus("Error");
-                } else {
-                	fileEvent.setStatus("Success");
-                }
+                fileEvent.setStatus("Success");
                 
             } catch (Exception e) {
                 e.printStackTrace();

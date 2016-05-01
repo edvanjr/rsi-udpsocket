@@ -39,17 +39,6 @@ public class UDPServer {
 				if(arquivo.getStatus().equalsIgnoreCase("Error")){
 					System.out.println("Ocorreu um erro no pacote");
 					System.out.println("Aguardando reenvio...");
-					
-					// Enviando a resposta para o cliente
-					InetAddress IPAdress = incomingPacket.getAddress();
-					int port = incomingPacket.getPort();
-					String reply = "Erro no pacote.";
-					
-					byte[] replyBytea = reply.getBytes();
-					DatagramPacket replyPacket = new DatagramPacket(replyBytea, replyBytea.length, IPAdress, port);
-					socket.send(replyPacket);
-					Thread.sleep(3000);
-					
 				} else {
 					criarArquivo();
 					

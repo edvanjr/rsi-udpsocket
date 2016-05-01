@@ -3,17 +3,16 @@ package com.rsi.udpsocket;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
+import java.net.SocketException;
+import java.net.SocketTimeoutException;
 import java.util.Random;
-import java.util.concurrent.TimeoutException;
 
-public class SocketError {
+public class SocketError extends DatagramSocket{
 	
-	private DatagramSocket socket;
-	private Double errorProb;
+	private Double errorProb = 0.0;
 	
-	public SocketError(DatagramSocket socket){
-		this.socket = socket;
-		this.errorProb = 0.0;
+	public SocketError() throws SocketException {
+		super();
 	}
 	
 	public void setErrorProb(Double errorProb){
@@ -24,40 +23,28 @@ public class SocketError {
 		return this.errorProb;
 	}
 	
-	public void sendWithError(DatagramPacket dp){
+	public void sendWithError(DatagramPacket dp) throws IOException, SocketTimeoutException{
 		if(gerarProbabilidade() > errorProb){
-			try {
-				socket.send(dp);
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
+			send(dp);
+		} else {
+			throw new SocketTimeoutException();
 		}
 	}
 	
-	public byte[] recvWithError(DatagramPacket dp){
-		try {
+	public byte[] recvWithError(DatagramPacket dp) throws IOException{
 			
-			socket.receive(dp);
-			
-			if(gerarProbabilidade() > errorProb){
-				return dp.getData();
-			} else {
-				throw new TimeoutException();
-			}
-		} catch (IOException e) {
-			e.printStackTrace();
-		} catch (TimeoutException e) {
-			e.printStackTrace();
+		receive(dp);
+		
+		if(gerarProbabilidade() > errorProb){
+			return dp.getData();
+		} else {
+			throw new SocketTimeoutException();
 		}
-		return null;
 	}
 	
 	
 	public Double gerarProbabilidade(){
 		Random random = new Random();
-		Double prob = random.nextInt(101) / 100.0;
-		return prob;
+		return random.nextDouble();
 	}
-	
-
 }
