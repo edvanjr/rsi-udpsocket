@@ -1,91 +1,85 @@
 package com.rsi.udpsocket;
 
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.ObjectInputStream;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
+import java.nio.charset.Charset;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
 
 public class UDPServer {
 	private DatagramSocket socket = null;
-	private Arquivo arquivo = null;
+	private byte[] arquivo = null;
+	
+	private byte[] retorno;
 	
 	public UDPServer() {
 		
 	}
 	
 	public void criarSocket(){
+		
+		System.out.println("Aguardando envio de pacotes...");
+		
 		try{
+			
 			socket = new DatagramSocket(12000);
+			ArrayList<String> retornos = new ArrayList<>();
 			
-			byte[] incomingData = new byte[1024 * 1000 * 50];
-			
-			System.out.println("Aguardando envio de pacotes...");
+			String ack = "ack0";
+			String pktEsperado = "pkt0";
 			
 			while(true){
-				
-				DatagramPacket incomingPacket = new DatagramPacket(incomingData, incomingData.length);
+				byte[] incomingData = new byte[1000];
+				DatagramPacket incomingPacket = new DatagramPacket(incomingData, 0,incomingData.length);
 				socket.receive(incomingPacket);
-				byte[] data = incomingPacket.getData();
-				ByteArrayInputStream in = new ByteArrayInputStream(data);
-				ObjectInputStream is = new ObjectInputStream(in);
-				arquivo = (Arquivo) is.readObject();
 				
-				if(arquivo.getStatus().equalsIgnoreCase("Error")){
-					System.out.println("Ocorreu um erro no pacote");
-					System.out.println("Aguardando reenvio...");
-				} else {
-					criarArquivo();
-					
-					// Enviando a resposta para o cliente
-					InetAddress IPAdress = incomingPacket.getAddress();
-					int port = incomingPacket.getPort();
-					String reply = "Success";
-					
-					byte[] replyBytea = reply.getBytes();
+				Path arquivo = Paths.get("C:","Users", "Edvan Jr", "Desktop", incomingPacket.getAddress() + "-" + incomingPacket.getPort() + ".txt");
+
+				String data = new String(incomingPacket.getData(), 0, incomingPacket.getLength());
+				
+				String[] dados = data.split("--");
+				
+				InetAddress IPAdress = incomingPacket.getAddress();
+				int port = incomingPacket.getPort();
+				
+				if(!dados[1].equalsIgnoreCase(pktEsperado)){
+					byte[] replyBytea = ack.getBytes();
 					DatagramPacket replyPacket = new DatagramPacket(replyBytea, replyBytea.length, IPAdress, port);
 					socket.send(replyPacket);
-					Thread.sleep(3000);
-					System.exit(0);
+				}else{
+					
+					retornos.add(dados[2]);
+					
+					if(dados[1].equalsIgnoreCase("pkt0")){
+						ack = "ack0";
+						pktEsperado = "pkt1";
+						byte[] replyBytea = ack.getBytes();
+						DatagramPacket replyPacket = new DatagramPacket(replyBytea, replyBytea.length, IPAdress, port);
+						socket.send(replyPacket);
+					} else if (dados[1].equalsIgnoreCase("pkt1")){
+						ack = "ack1";
+						pktEsperado = "pkt0";
+						byte[] replyBytea = ack.getBytes();
+						DatagramPacket replyPacket = new DatagramPacket(replyBytea, replyBytea.length, IPAdress, port);
+						socket.send(replyPacket);
+					}
 				}
+				
+				if(Integer.parseInt(dados[0]) == retornos.size()){
+					Files.write(arquivo, retornos, Charset.forName("UTF-8"));
+					ack = "ack0";
+					pktEsperado = "pkt0";
+				}
+				
 				
 			}
 			
 		} catch (SocketException e){
-			e.printStackTrace();
-		} catch (IOException e){
-			e.printStackTrace();
-		} catch (ClassNotFoundException e){
-			e.printStackTrace();
-		} catch (InterruptedException e){
-			e.printStackTrace();
-		}
-	}
-	
-	// Responsável por ler e escrever o arquivo 
-	public void criarArquivo() {
-		String outputFile = arquivo.getDiretorioDestino() + arquivo.getNomeArquivo();
-		
-		if(!new File(arquivo.getDiretorioDestino()).exists()){
-			new File(arquivo.getDiretorioDestino()).mkdirs();
-		}
-		
-		File dstFile = new File(outputFile);
-		FileOutputStream fileOutputStream = null;
-		
-		try{
-			fileOutputStream = new FileOutputStream(dstFile);
-			fileOutputStream.write(arquivo.getArquivo());
-			fileOutputStream.flush();
-			fileOutputStream.close();
-			
-			System.out.println("Arquivo salvo com sucesso.");
-		} catch (FileNotFoundException e){
 			e.printStackTrace();
 		} catch (IOException e){
 			e.printStackTrace();

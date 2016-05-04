@@ -1,83 +1,87 @@
 package com.rsi.udpsocket;
 
-import java.io.BufferedReader;
-import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.ObjectOutputStream;
 import java.net.DatagramPacket;
 import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
-import java.nio.charset.Charset;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.List;
+import java.util.Arrays;
 
 public class UDPClient {
     private SocketError socket = null;
-    private Arquivo arquivo = null;
     private String arquivoOrigem = "C:/Users/Edvan Jr/Documents/texto.txt";
-    private String arquivoDestino = "C:/Users/Edvan Jr/Desktop/";
     private String hostName = "localHost";
 
     public UDPClient() {
 
     }
 
-    public void conexao() {
+	public void conexao() {
         try {
-        	boolean ok = false;
+        	ArrayList<byte[]> dados = readFile();
+        	int qtdPck = dados.size();
+        	int count = 0;
         	
-        	ArrayList<String> dados = readFile();
-        	int count = dados.size();
-        	
-        	while(count >= 0){
+        	socket = new SocketError();
+        	socket.setErrorProb(0.4);
+        	socket.setSoTimeout(2000);
+            InetAddress IPAddress = InetAddress.getByName(hostName);
+            byte[] incomingData = new byte[1024];
+            
+            String pkt = "pkt0";
+            String ack = "ack0";
+
+            	
+        	while(count < qtdPck){
         		
-	        	socket = new SocketError();
-	        	socket.setErrorProb(0.8);
-	        	
-	            InetAddress IPAddress = InetAddress.getByName(hostName);
-	            
-	            // Criando arquivo a ser enviado
-	            byte[] incomingData = new byte[1024];
-	            arquivo = getArquivo();
-	            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-	            ObjectOutputStream os = new ObjectOutputStream(outputStream);
-	            os.writeObject(arquivo);
-	            byte[] data = outputStream.toByteArray();
-	            
-	            System.out.println(data.length);
-	            
-	            
-	            try{
-	            	
-	            	// Enviando pacote
-	            	DatagramPacket sendPacket = new DatagramPacket(data, data.length, IPAddress, 12000);
-	            	
-	            	socket.sendWithError(sendPacket);
-	            	System.out.println("Arquivo enviado...");
-	            	
-	            	//Recebendo resposta
-            		DatagramPacket incomingPacket = new DatagramPacket(incomingData, incomingData.length);
+        		String temp = qtdPck + "--" + pkt + "--" + new String(dados.get(count), 0, dados.get(count).length);
+        		byte[] data = temp.getBytes();
+        		
+            	// Pacote a enviar
+            	DatagramPacket sendPacket = new DatagramPacket(data, data.length, IPAddress, 12000);
+            	
+            	//Resposta a receber
+        		DatagramPacket incomingPacket = new DatagramPacket(incomingData, incomingData.length);
+        		
+        		//Enviando pacote
+				socket.sendWithError(sendPacket);
+				System.out.println("Enviando " + pkt);
+				
+				if(pkt.equalsIgnoreCase("pkt0")){
+					ack = "ack0";
+				}else{
+					ack = "ack1";
+				}
+        		
+    			try{
+    				
+    				//Recebendo resposta
     	            socket.recvWithError(incomingPacket);
+    	            
     	            String resposta = new String(incomingPacket.getData(), 0, incomingPacket.getLength());
-   	                System.out.println("Resposta recebida: " + resposta);
-   	                
-   	                ok = true;
-	            	
-	            	
-	            }catch(SocketTimeoutException e) {
-	            	System.out.println("SocketTimeoutException: Reenviando o pacote...");
-	            	continue;
-	            }
+    	            
+    	            if(resposta.equalsIgnoreCase(ack)){
+    	            	if(ack.equalsIgnoreCase("ack0")){
+    	            		pkt = "pkt1";
+    	            	} else if (ack.equalsIgnoreCase("ack1")){
+    	            		pkt = "pkt0";
+    	            	}
+    	            } else {
+    	            	continue;
+    	            }
+    	            
+                    System.out.println("Resposta recebida: " + resposta);
+    	            count = count + 1;
+    			} catch (SocketTimeoutException e){
+    				System.out.println("SocketTimeoutException: Reenviando o pacote...");
+    				continue;
+    			}
+            	
         	}
         	
         	Thread.sleep(2000);
@@ -94,14 +98,35 @@ public class UDPClient {
     }
     
     
-    public byte[] readFile(){
-    	Path file = Paths.get("C:", "Users", "Edvan Jr", "Documents", "texto.txt");
+    public ArrayList<byte[]> readFile(){
     	
-    	if(Files.exists(file)){
-    		try{ 
+    	double pctSize = 1000.0;
+    	
+    	File file = new File(arquivoOrigem);
+    	if(file.isFile()){
+    		try{
+    			ArrayList<byte[]> dados = new ArrayList<byte[]>();
+    			DataInputStream diStream = new DataInputStream(new FileInputStream(file));
     			
-    			byte[] b = Files.readAllBytes(file);
-    		    return b;
+    			long len = (int) file.length();
+    			byte[] fileBytes = new byte[(int) len];
+                int read = 0;
+                int numRead = 0;
+                while (read < fileBytes.length && (numRead = diStream.read(fileBytes, read,
+                        fileBytes.length - read)) >= 0) {
+                    read = read + numRead;
+                }
+                
+    			int qtdPacotes = (int) Math.ceil(len / pctSize);
+    			
+    			int start = 0;
+    			for(int i = 1; i <= qtdPacotes; i++){
+    				int end = (int) (i * pctSize);
+    				dados.add(Arrays.copyOfRange(fileBytes, start, end));
+    				start = end;
+    			}
+    			
+    		    return dados;
     		    
         	} catch (IOException e) {
     		    System.err.println(e);
@@ -113,43 +138,6 @@ public class UDPClient {
     	}
     	
 	}
-    
-    
-    // Método responsável por criar o objeto que vai com o arquivo
-    public Arquivo getArquivo() {
-    	
-        Arquivo fileEvent = new Arquivo();
-        String fileName = arquivoOrigem.substring(arquivoOrigem.lastIndexOf("/") + 1, arquivoOrigem.length());
-        String path = arquivoOrigem.substring(0, arquivoOrigem.lastIndexOf("/") + 1);
-        fileEvent.setDiretorioDestino(arquivoDestino);
-        fileEvent.setNomeArquivo(fileName);
-        fileEvent.setDiretorioOrigem(arquivoOrigem);
-        File file = new File(arquivoOrigem);
-        if (file.isFile()) {
-            try {
-                DataInputStream diStream = new DataInputStream(new FileInputStream(file));
-                long len = (int) file.length();
-                byte[] fileBytes = new byte[(int) len];
-                int read = 0;
-                int numRead = 0;
-                while (read < fileBytes.length && (numRead = diStream.read(fileBytes, read,
-                        fileBytes.length - read)) >= 0) {
-                    read = read + numRead;
-                }
-                fileEvent.setTamanhoArquivo(len);
-                fileEvent.setArquivo(fileBytes);
-                fileEvent.setStatus("Success");
-                
-            } catch (Exception e) {
-                e.printStackTrace();
-                fileEvent.setStatus("Error");
-            }
-        } else {
-            System.out.println("Caminho do arquivo não encontrado.");
-            fileEvent.setStatus("Error");
-        }
-        return fileEvent;
-    }
     
     public static void main(String[] args) {
         UDPClient client = new UDPClient();
